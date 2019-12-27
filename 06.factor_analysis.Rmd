@@ -1,0 +1,273 @@
+---
+title: 'Factor Analysis'
+author: "Rohan Kumar"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load the libraries + functions
+
+Load all the libraries or functions that you will use to for the rest of the assignment. It is helpful to define your libraries and functions at the top of a report, so that others can know what they need for the report to compile correctly.
+
+```{r libaries}
+##r chunk
+
+library(car)
+library(carData)
+library(reticulate)
+library(Rling)
+library(psych)
+py_config()
+
+use_python("C:\\Users\\Rohan Singh\\Anaconda3\\envs\\r-reticulate\\python")
+```
+
+```{r install_packages}
+
+##r chunk
+
+py_install("pandas")
+
+py_install("numpy")
+
+py_install("scikit-learn")
+
+py_install("matplotlib") 
+
+py_install("factor-analyzer", pip = T)
+
+
+```
+
+
+Do the same for the Python libraries you will need. 
+
+```{python}
+##python chunk 
+
+import matplotlib as mb
+import pandas as pd
+from factor_analyzer import FactorAnalyzer
+
+```
+
+## The Data
+
+The data is provided as `liwc_house_conflict.csv`. We collected over 1000 different speeches given on the floor of the US House of Representatives that discussed different war time conflicts with Iraq, Kuwait, Russia, Syria, Iran, and a few others. This data was then processed with the Linguistic Inquiry and Word Count software, which provides a linguistic frequency analysis for many categories. 
+
+You should pick 15-20 categories that you think might cluster together and/or be interesting to examine for their register relatedness. You can learn more about the categories by checking out the attached manual starting on page four. Do not use the "total" categories with their subgroups or you might get a singular matrix error. You might also consider running a quick summary on your choosen categories as well, to make sure they are not effectly zero frequency (i.e., most of the informal language ones will be very small percents due to the location of the speech).
+
+Import your data and create a data frame here with only the categories you are interested in.
+
+For analysis, the following 20 categories are picked:
+
+Analytic - Analytical Thinking
+Clout - Clout
+Authentic - Authentic
+Tone - Emotional Tone
+WPS - Words per sentence
+Sixltr - Words > 6 letters
+Dic - Dictionary Words
+posemo - Positive Emotion
+negemo - Negative Emotion
+anx- Anxiety
+anger- Anger
+sad- Sadness
+social- Social processes
+female - Female references
+male - Male references
+cogproc- Cognitive processes
+insight- Insight
+tentat- Tentative
+certain- Certain
+percept- Perceptualprocesses
+
+```{r thedata}
+##r chunk
+
+liwc_houseconflict= read.csv("C:\\Users\\Rohan Singh\\R practise\\540\\liwc_house_conflict.csv")
+
+
+rownames(liwc_houseconflict) = liwc_houseconflict[,1]
+liwc_houseconflict =liwc_houseconflict %>% dplyr::select(Analytic,Clout,Authentic,Tone,WPS,Sixltr,Dic,posemo,negemo,anx, anger,sad,social , female,male,cogproc, insight, tentat, certain, percept)
+
+head(liwc_houseconflict)
+
+str(liwc_houseconflict)
+
+```
+
+Transfer the data over to python to use as well. 
+
+```{python}
+##python chunk
+
+import pandas as pd
+
+#liwc_house_conflict_py = pd.read_csv("C:\\Users\\Rohan Singh\\R practise\\540\\liwc_house_conflict.csv")
+
+liwc_house_conflict_py= r.liwc_houseconflict
+
+#move over data from R or import it with pd.read_csv
+#reg_bnc_py = r.reg_bnc
+
+#look at the data
+liwc_house_conflict_py.head()
+
+#get rid of extra columns we don't need 
+#liwc_house_conflict_py.drop(['Filename','Segment'], axis = 1, inplace = True)
+
+```
+
+## Before you start
+
+Include Bartlett's test and the KMO statistic to determine if you have adequate correlations and sampling before running an EFA. 
+
+```{r beforeyougo}
+##r chunk
+
+#install.packages("corTest"-1
+
+correlation= cor(liwc_houseconflict[,1])
+
+cortest.bartlett(correlation, n=nrow(liwc_houseconflict))
+
+```
+
+Include Bartlett's test and the KMO statistic from Python. Do they appear to match? 
+
+```{python}
+##python chunk
+
+#import bartlett test
+from factor_analyzer.factor_analyzer import calculate_bartlett_sphericity
+
+#calculate bartlett
+chi_square_value, p_value = calculate_bartlett_sphericity(liwc_house_conflict_py)
+
+#output the answer
+chi_square_value, p_value
+
+```
+
+## How many factors?
+
+- Explore how many factors you should use.
+  - Include a parallel analysis and scree plot.
+  - Sum the Kaiser criterion.
+  - Go with the smaller number of items or the most agreement between different criteria. 
+
+```{r howmany}
+##r chunk
+
+number_items= fa.parallel(liwc_houseconflict[,3:95],
+                          fm="ml",
+                          fa="both")
+
+```
+
+- Include the scree plot and summation of the eigenvalues from Python. 
+
+```{python}
+##python chunk
+#save factor analysis function
+from factor_analyzer import FactorAnalyzer
+fa = FactorAnalyzer(n_factors = len(liwc_house_conflict_py.columns),
+                    rotation = None)
+
+#run an analysis just to get the eigenvalues
+fa.fit(liwc_house_conflict_py)
+
+#view the eigenvalues
+ev, v = fa.get_eigenvalues()
+ev
+
+```
+```{python}
+##python chunk
+
+import matplotlib
+
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
+
+plt.scatter(range(1,liwc_house_conflict_py.shape[1]+1),ev)
+plt.plot(range(1,liwc_house_conflict_py.shape[1]+1),ev)
+plt.title('scree Plot')
+plt.xlabel('Factors')
+plt.ylabel('Eigenvalue')
+plt.grid()
+plt.show()
+
+```
+
+
+
+## Simple structure - run the EFA
+
+- Run the EFA in both R and Python
+  - Include the saved `fa` code, but then be sure to print out the results, so the summary is on your report.
+  - Plot the results from your analysis. 
+
+```{r runit}
+##r chunk
+##save it
+
+sum(number_items$fa.values > 1)
+sum(number_items$fa.values > .7)
+
+library(GPArotation)
+
+EFA_fit = fa(liwc_houseconflict[,3:95], #data
+             nfactors = 2, #number of factors
+             rotate = "oblimin", #rotation
+             fm = "ml") #math
+
+##print it out
+EFA_fit$loadings #look at the full results
+
+
+##plot the results
+
+fa.plot(EFA_fit, 
+     labels = colnames(liwc_houseconflict[ , 3:95]))
+
+fa.diagram(EFA_fit)
+
+```
+
+- For Python, run the factor analysis and print out the loadings. Do they appear to have the same results?
+
+```{python}
+##python chunk
+
+fa = FactorAnalyzer(n_factors = 2, rotation = "oblimin")
+fa.fit(liwc_house_conflict_py)
+
+#Print it out 
+
+fa.loadings_ #notice underscore 
+
+fa.get_factor_variance() ##ss, prop, cumulative
+
+
+
+
+
+```
+
+
+## Adequate solution
+
+- Examine the fit indice(s). Are they any good? How might you interpret them?
+```{r}
+##r chunk 
+EFA_fit$rms #Root mean square of the residuals
+EFA_fit$RMSEA #root mean squared error of approximation
+EFA_fit$TLI #tucker lewis index
+```
+- Examine the results - what do they appear to tell you? Are there groupings of variables in these analyses that might explain different structures/jargons/registers in language we find in Congress? 
